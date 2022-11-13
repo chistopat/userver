@@ -7,6 +7,7 @@
 #include <userver/cache/lru_cache_config.hpp>
 #include <userver/components/loggable_component_base.hpp>
 #include <userver/concurrent/async_event_source.hpp>
+#include <userver/dump/dumper.hpp>
 #include <userver/dynamic_config/source.hpp>
 #include <userver/testsuite/component_control.hpp>
 #include <userver/utils/statistics/storage.hpp>
@@ -77,7 +78,8 @@ yaml_config::Schema GetLruCacheComponentBaseSchema();
 // clang-format on
 template <typename Key, typename Value, typename Hash = std::hash<Key>,
           typename Equal = std::equal_to<Key>>
-class LruCacheComponent : public components::LoggableComponentBase {
+class LruCacheComponent : public components::LoggableComponentBase,
+                          private dump::DumpableEntity {
  public:
   using Cache = ExpirableLruCache<Key, Value, Hash, Equal>;
   using CacheWrapper = LruCacheWrapper<Key, Value, Hash, Equal>;
@@ -90,6 +92,10 @@ class LruCacheComponent : public components::LoggableComponentBase {
   CacheWrapper GetCache();
 
   static yaml_config::Schema GetStaticConfigSchema();
+
+  void GetAndWrite(dump::Writer& writer) const override;
+
+  void ReadAndSet(dump::Reader& reader) override;
 
  protected:
   virtual Value DoGetByKey(const Key& key) = 0;
@@ -113,6 +119,7 @@ class LruCacheComponent : public components::LoggableComponentBase {
   concurrent::AsyncEventSubscriberScope config_subscription_;
   utils::statistics::Entry statistics_holder_;
   std::optional<testsuite::ComponentInvalidatorHolder> invalidator_holder_;
+  dump::Dumper dumper_;
 };
 
 template <typename Key, typename Value, typename Hash, typename Equal>
@@ -123,7 +130,8 @@ LruCacheComponent<Key, Value, Hash, Equal>::LruCacheComponent(
       name_(components::GetCurrentComponentName(config)),
       static_config_(config),
       cache_(std::make_shared<Cache>(static_config_.ways,
-                                     static_config_.GetWaySize())) {
+                                     static_config_.GetWaySize())),
+      dumper_(config, context, *this) {
   cache_->SetMaxLifetime(static_config_.config.lifetime);
   cache_->SetBackgroundUpdate(static_config_.config.background_update);
 
@@ -198,6 +206,18 @@ template <typename Key, typename Value, typename Hash, typename Equal>
 yaml_config::Schema
 LruCacheComponent<Key, Value, Hash, Equal>::GetStaticConfigSchema() {
   return impl::GetLruCacheComponentBaseSchema();
+}
+
+template <typename Key, typename Value, typename Hash, typename Equal>
+void LruCacheComponent<Key, Value, Hash, Equal>::GetAndWrite(
+    dump::Writer& writer) const {
+
+}
+
+template <typename Key, typename Value, typename Hash, typename Equal>
+void LruCacheComponent<Key, Value, Hash, Equal>::ReadAndSet(
+    dump::Reader& reader) {
+
 }
 
 }  // namespace cache
