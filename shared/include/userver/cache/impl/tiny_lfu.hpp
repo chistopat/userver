@@ -39,7 +39,7 @@ class LruBase<T, U, Hash, Equal, CachePolicy::kTinyLFU, InnerPolicy> {
   std::size_t GetSize() const;
 
  private:
-  FrequencySketch<T, internal::Jenkins<T>, FrequencySketchPolicy::CaffeineBloom> proxy_;
+  FrequencySketch<T, utils::Jenkins<T>, FrequencySketchPolicy::CaffeineBloom> proxy_;
   std::size_t max_size_;
   LruBase<T, U, Hash, Equal, InnerPolicy> main_;
 };
@@ -85,7 +85,7 @@ template <typename T, typename U, typename Hash, typename Equal,
           CachePolicy InnerPolicy>
 LruBase<T, U, Hash, Equal, CachePolicy::kTinyLFU, InnerPolicy>::LruBase(
     std::size_t max_size, const Hash& hash, const Equal& equal)
-    : proxy_(max_size, internal::Jenkins<T>{}),
+    : proxy_(max_size, utils::Jenkins<T>{}),
       max_size_(max_size),
       main_(max_size, hash, equal) {}
 
@@ -156,8 +156,8 @@ template <typename T, typename U, typename Hash, typename Equal,
 void LruBase<T, U, Hash, Equal, CachePolicy::kTinyLFU, InnerPolicy>::SetMaxSize(
     std::size_t new_max_size) {
   auto new_proxy =
-      FrequencySketch<T, internal::Jenkins<T>, FrequencySketchPolicy::CaffeineBloom>(
-          new_max_size, internal::Jenkins<T>{});
+      FrequencySketch<T, utils::Jenkins<T>, FrequencySketchPolicy::CaffeineBloom>(
+          new_max_size, utils::Jenkins<T>{});
   main_.VisitAll([&new_proxy](const T& key, const U&) mutable {
     new_proxy.RecordAccess(key);
   });
