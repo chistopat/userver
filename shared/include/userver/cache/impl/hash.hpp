@@ -5,7 +5,7 @@
 USERVER_NAMESPACE_BEGIN
 
 namespace cache::impl::utils {
-size_t NextPowerOfTwo(size_t n) {
+inline size_t NextPowerOfTwo(size_t n) {
   assert(n > 0);
   n--;
   n |= n >> 1;

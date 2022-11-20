@@ -5,7 +5,7 @@
 
 USERVER_NAMESPACE_BEGIN
 
-using Jenkins = cache::impl::internal::Jenkins<int>;
+using Jenkins = cache::impl::utils::Jenkins<int>;
 using Doorkeeper = cache::impl::Doorkeeper<int, Jenkins>;
 
 TEST(Doorkeeper, Put) {

@@ -10,7 +10,7 @@ USERVER_NAMESPACE_BEGIN
 template <typename T>
 class FrequencySketchF : public ::testing::Test {
  public:
-  using Hash = cache::impl::internal::Jenkins<double>;
+  using Hash = cache::impl::utils::Jenkins<double>;
   using FrequencySketch = cache::impl::FrequencySketch<double, Hash, T::value>;
 };
 
@@ -49,7 +49,7 @@ TYPED_TEST(FrequencySketchF, Reset) {
 }
 
 TEST(FrequencySketchF, Full) {
-  using Hash = cache::impl::internal::Jenkins<double>;
+  using Hash = cache::impl::utils::Jenkins<double>;
   using FrequencySketch =
       cache::impl::FrequencySketch<double, Hash,
                                    cache::FrequencySketchPolicy::Bloom>;

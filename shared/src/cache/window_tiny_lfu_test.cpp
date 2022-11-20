@@ -3,10 +3,11 @@
 #include <userver/cache/impl/window_tiny_lfu.hpp>
 
 USERVER_NAMESPACE_BEGIN
-
+using Hash = std::hash<int>;
+using Equal = std::equal_to<int>;
 using WTinyLFU =
-    cache::impl::LruBase<int, int, std::hash<int>,
-                         std::equal_to<int>, cache::CachePolicy::kWTinyLFU>;
+    cache::impl::LruBase<int, int, Hash,
+                         Equal, cache::CachePolicy::kWTinyLFU>;
 
 // TODO: don't depend on SLRU probation_part which is 0.8 by default
 TEST(WTinyLFU, PutNew) {
