@@ -18,7 +18,9 @@ using PolicyTypes = ::testing::Types<
     std::integral_constant<cache::FrequencySketchPolicy,
                            cache::FrequencySketchPolicy::Bloom>,
     std::integral_constant<cache::FrequencySketchPolicy,
-                           cache::FrequencySketchPolicy::DoorkeeperBloom>>;
+                           cache::FrequencySketchPolicy::DoorkeeperBloom>,
+    std::integral_constant<cache::FrequencySketchPolicy,
+                           cache::FrequencySketchPolicy::CaffeineBloom>>;
 
 TYPED_TEST_SUITE(FrequencySketchF, PolicyTypes, );
 
