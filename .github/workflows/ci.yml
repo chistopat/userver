@@ -7,6 +7,7 @@ name: CI
           - master
           - develop
           - feature/**
+          - develop-improve-lru
 
 env:
     UBSAN_OPTIONS: print_stacktrace=1
