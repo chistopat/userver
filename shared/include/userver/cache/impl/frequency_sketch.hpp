@@ -286,9 +286,12 @@ template <typename T, typename Hash>
 uint32_t
 FrequencySketch<T, Hash, FrequencySketchPolicy::CaffeineBloom>::SetBitCount(
     int64_t x) {
-  x = x - ((x >> 1) & 0x5555555555555555);
-  x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333);
-  return static_cast<uint32_t>((((x + (x >> 4)) & 0xF0F0F0F0F0F0F0F) * 0x101010101010101) >> 56);
+  uint32_t ret = 0;
+  while (x != 0) {
+    x &= (x - 1);
+    ++ret;
+  }
+  return ret;
 }
 
 template <typename T, typename Hash>
