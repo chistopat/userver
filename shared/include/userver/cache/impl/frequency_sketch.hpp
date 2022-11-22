@@ -66,7 +66,7 @@ class FrequencySketch<T, Hash, FrequencySketchPolicy::DoorkeeperBloom> {
 template <typename T, typename Hash>
 FrequencySketch<T, Hash, FrequencySketchPolicy::Bloom>::FrequencySketch(
     size_t capacity, const Hash& hash)
-    : table_(utils::NextPowerOfTwo(capacity) >> 2), hash_(hash) {}
+    : table_(tools::NextPowerOfTwo(capacity) >> 2), hash_(hash) {}
 
 template <typename T, typename Hash>
 int FrequencySketch<T, Hash, FrequencySketchPolicy::Bloom>::GetFrequency(
