@@ -102,7 +102,12 @@ void HttpResponse::SetSendFailed(
   request::ResponseBase::SetSendFailed(failure_time);
 }
 
-void HttpResponse::SetHeader(std::string name, std::string value) {
+bool HttpResponse::SetHeader(std::string name, std::string value) {
+  if (headers_end_.IsReady()) {
+    // Attempt to set headers for Stream'ed response after it is already set
+    return false;
+  }
+
   CheckHeaderName(name);
   CheckHeaderValue(value);
   const auto header_it = headers_.find(name);
@@ -111,6 +116,8 @@ void HttpResponse::SetHeader(std::string name, std::string value) {
   } else {
     header_it->second = std::move(value);
   }
+
+  return true;
 }
 
 void HttpResponse::SetContentType(
@@ -123,9 +130,25 @@ void HttpResponse::SetContentEncoding(std::string encoding) {
             std::move(encoding));
 }
 
-void HttpResponse::SetStatus(HttpStatus status) { status_ = status; }
+bool HttpResponse::SetStatus(HttpStatus status) {
+  if (headers_end_.IsReady()) {
+    // Attempt to set headers for Stream'ed response after it is already set
+    return false;
+  }
 
-void HttpResponse::ClearHeaders() { headers_.clear(); }
+  status_ = status;
+  return true;
+}
+
+bool HttpResponse::ClearHeaders() {
+  if (headers_end_.IsReady()) {
+    // Attempt to set headers for Stream'ed response after it is already set
+    return false;
+  }
+
+  headers_.clear();
+  return true;
+}
 
 void HttpResponse::SetCookie(Cookie cookie) {
   CheckHeaderValue(cookie.Name());
@@ -209,10 +232,12 @@ void HttpResponse::SendResponse(engine::io::Socket& socket) {
     header.append(kCrlf);
   }
 
-  if (IsBodyStreamed())
+  if (IsBodyStreamed() && GetData().empty()) {
     SetBodyStreamed(socket, header);
-  else
+  } else {
+    // e.g. a CustomHandlerException
     SetBodyNotstreamed(socket, header);
+  }
 }
 
 void HttpResponse::SetBodyNotstreamed(engine::io::Socket& socket,
@@ -255,12 +280,10 @@ void HttpResponse::SetBodyStreamed(engine::io::Socket& socket,
 
   // send HTTP headers
   size_t sent_bytes = socket.SendAll(header.data(), header.size(), {});
-
   std::string().swap(header);  // free memory before time consuming operation
 
   // Transmit HTTP response body
   std::string body_part;
-
   while (body_stream_->Pop(body_part)) {
     if (body_part.empty()) {
       LOG_DEBUG() << "Zero size body_part in http_response.cpp";

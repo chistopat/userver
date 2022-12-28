@@ -24,9 +24,9 @@ namespace impl {
 formats::json::Value GetCacheStatisticsAsJson(
     const ExpirableLruCacheStatistics& stats, std::size_t size);
 
-template <typename Key, typename Value, typename Hash, typename Equal>
+template <typename Key, typename Value, typename Hash, typename Equal, CachePolicy Policy>
 formats::json::Value GetCacheStatisticsAsJson(
-    const ExpirableLruCache<Key, Value, Hash, Equal>& cache) {
+    const ExpirableLruCache<Key, Value, Hash, Equal, Policy>& cache) {
   return GetCacheStatisticsAsJson(cache.GetStatistics(),
                                   cache.GetSizeApproximate());
 }
@@ -81,13 +81,14 @@ yaml_config::Schema GetLruCacheComponentBaseSchema();
 
 // clang-format on
 template <typename Key, typename Value, typename Hash = std::hash<Key>,
-          typename Equal = std::equal_to<Key>>
+          typename Equal = std::equal_to<Key>,
+          CachePolicy Policy = CachePolicy::kLRU>
 // NOLINTNEXTLINE(fuchsia-multiple-inheritance)
 class LruCacheComponent : public components::LoggableComponentBase,
                           private dump::DumpableEntity {
  public:
-  using Cache = ExpirableLruCache<Key, Value, Hash, Equal>;
-  using CacheWrapper = LruCacheWrapper<Key, Value, Hash, Equal>;
+  using Cache = ExpirableLruCache<Key, Value, Hash, Equal, Policy>;
+  using CacheWrapper = LruCacheWrapper<Key, Value, Hash, Equal, Policy>;
 
   LruCacheComponent(const components::ComponentConfig&,
                     const components::ComponentContext&);
@@ -122,15 +123,16 @@ class LruCacheComponent : public components::LoggableComponentBase,
  private:
   const std::string name_;
   const LruCacheConfigStatic static_config_;
-  std::optional<dump::Dumper> dumper_;
+  std::shared_ptr<dump::Dumper> dumper_;
   const std::shared_ptr<Cache> cache_;
   concurrent::AsyncEventSubscriberScope config_subscription_;
   utils::statistics::Entry statistics_holder_;
   std::optional<testsuite::ComponentInvalidatorHolder> invalidator_holder_;
 };
 
-template <typename Key, typename Value, typename Hash, typename Equal>
-LruCacheComponent<Key, Value, Hash, Equal>::LruCacheComponent(
+template <typename Key, typename Value, typename Hash, typename Equal,
+          CachePolicy Policy>
+LruCacheComponent<Key, Value, Hash, Equal, Policy>::LruCacheComponent(
     const components::ComponentConfig& config,
     const components::ComponentContext& context)
     : LoggableComponentBase(config, context),
@@ -139,8 +141,9 @@ LruCacheComponent<Key, Value, Hash, Equal>::LruCacheComponent(
       cache_(std::make_shared<Cache>(static_config_.ways,
                                      static_config_.GetWaySize())) {
   if (impl::IsDumpSupportEnabled(config)) {
-    dumper_.emplace(config, context, static_cast<dump::DumpableEntity&>(*this));
-    cache_->SetDumper(*dumper_);
+    dumper_ = std::make_shared<dump::Dumper>(
+        config, context, static_cast<dump::DumpableEntity&>(*this));
+    cache_->SetDumper(dumper_);
     dumper_->ReadDump();
   }
 
@@ -155,7 +158,8 @@ LruCacheComponent<Key, Value, Hash, Equal>::LruCacheComponent(
     config_subscription_ =
         impl::FindDynamicConfigSource(context).UpdateAndListen(
             this, "cache." + name_,
-            &LruCacheComponent<Key, Value, Hash, Equal>::OnConfigUpdate);
+            &LruCacheComponent<Key, Value, Hash, Equal,
+                               Policy>::OnConfigUpdate);
   } else {
     LOG_INFO() << "Dynamic LRU cache config is disabled, cache=" << name_;
   }
@@ -167,11 +171,12 @@ LruCacheComponent<Key, Value, Hash, Equal>::LruCacheComponent(
 
   invalidator_holder_.emplace(
       impl::FindComponentControl(context), *this,
-      &LruCacheComponent<Key, Value, Hash, Equal>::DropCache);
+      &LruCacheComponent<Key, Value, Hash, Equal, Policy>::DropCache);
 }
 
-template <typename Key, typename Value, typename Hash, typename Equal>
-LruCacheComponent<Key, Value, Hash, Equal>::~LruCacheComponent() {
+template <typename Key, typename Value, typename Hash, typename Equal,
+          CachePolicy Policy>
+LruCacheComponent<Key, Value, Hash, Equal, Policy>::~LruCacheComponent() {
   invalidator_holder_.reset();
   statistics_holder_.Unregister();
   config_subscription_.Unsubscribe();
@@ -181,24 +186,29 @@ LruCacheComponent<Key, Value, Hash, Equal>::~LruCacheComponent() {
   }
 }
 
-template <typename Key, typename Value, typename Hash, typename Equal>
-typename LruCacheComponent<Key, Value, Hash, Equal>::CacheWrapper
-LruCacheComponent<Key, Value, Hash, Equal>::GetCache() {
+template <typename Key, typename Value, typename Hash, typename Equal,
+          CachePolicy Policy>
+typename LruCacheComponent<Key, Value, Hash, Equal, Policy>::CacheWrapper
+LruCacheComponent<Key, Value, Hash, Equal, Policy>::GetCache() {
   return CacheWrapper(cache_, [this](const Key& key) { return GetByKey(key); });
 }
 
-template <typename Key, typename Value, typename Hash, typename Equal>
-void LruCacheComponent<Key, Value, Hash, Equal>::DropCache() {
+template <typename Key, typename Value, typename Hash, typename Equal,
+          CachePolicy Policy>
+void LruCacheComponent<Key, Value, Hash, Equal, Policy>::DropCache() {
   cache_->Invalidate();
 }
 
-template <typename Key, typename Value, typename Hash, typename Equal>
-Value LruCacheComponent<Key, Value, Hash, Equal>::GetByKey(const Key& key) {
+template <typename Key, typename Value, typename Hash, typename Equal,
+          CachePolicy Policy>
+Value LruCacheComponent<Key, Value, Hash, Equal, Policy>::GetByKey(
+    const Key& key) {
   return DoGetByKey(key);
 }
 
-template <typename Key, typename Value, typename Hash, typename Equal>
-void LruCacheComponent<Key, Value, Hash, Equal>::OnConfigUpdate(
+template <typename Key, typename Value, typename Hash, typename Equal,
+          CachePolicy Policy>
+void LruCacheComponent<Key, Value, Hash, Equal, Policy>::OnConfigUpdate(
     const dynamic_config::Snapshot& cfg) {
   const auto config = GetLruConfig(cfg, name_);
   if (config) {
@@ -210,17 +220,19 @@ void LruCacheComponent<Key, Value, Hash, Equal>::OnConfigUpdate(
   }
 }
 
-template <typename Key, typename Value, typename Hash, typename Equal>
-void LruCacheComponent<Key, Value, Hash, Equal>::UpdateConfig(
+template <typename Key, typename Value, typename Hash, typename Equal,
+          CachePolicy Policy>
+void LruCacheComponent<Key, Value, Hash, Equal, Policy>::UpdateConfig(
     const LruCacheConfig& config) {
   cache_->SetWaySize(config.GetWaySize(static_config_.ways));
   cache_->SetMaxLifetime(config.lifetime);
   cache_->SetBackgroundUpdate(config.background_update);
 }
 
-template <typename Key, typename Value, typename Hash, typename Equal>
+template <typename Key, typename Value, typename Hash, typename Equal,
+          CachePolicy Policy>
 yaml_config::Schema
-LruCacheComponent<Key, Value, Hash, Equal>::GetStaticConfigSchema() {
+LruCacheComponent<Key, Value, Hash, Equal, Policy>::GetStaticConfigSchema() {
   return impl::GetLruCacheComponentBaseSchema();
 }
 

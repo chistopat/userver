@@ -37,6 +37,12 @@ file(GLOB_RECURSE MONGO_TEST_SOURCES
 )
 list(REMOVE_ITEM SOURCES ${MONGO_TEST_SOURCES})
 
+file(GLOB_RECURSE MONGO_FUNCTIONAL_TEST_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/functional_tests/*.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/functional_tests/*.hpp
+)
+list(REMOVE_ITEM SOURCES ${MONGO_FUNCTIONAL_TEST_SOURCES})
+
 file(GLOB_RECURSE BENCH_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/*_benchmark.cpp
 )
@@ -94,8 +100,6 @@ if (USERVER_IS_THE_ROOT_PROJECT)
     $<TARGET_FILE:${PROJECT_NAME}_mongotest>
     --gtest_output=xml:${CMAKE_BINARY_DIR}/test-results/${PROJECT_NAME}_mongotest.xml
   )
-endif()
 
-# Target with no need to use userver namespace, but includes require userver/
-add_library(yandex-${PROJECT_NAME} INTERFACE)
-target_link_libraries(yandex-${PROJECT_NAME} INTERFACE ${PROJECT_NAME})
+  add_subdirectory(functional_tests)
+endif()
